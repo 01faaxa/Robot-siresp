@@ -1,5 +1,5 @@
 # Piloto
-Primeiros projetos em python
+
 Este projeto é um robô de automação desenvolvido em Python que realiza agendamentos automáticos no sistema SIRESP (Sistema de Regulação Eletrônica de Saúde Pública de São Paulo). Ele foi criado para otimizar o processo de marcação de consultas e exames, reduzindo erros manuais e economizando tempo.
 ------------------------------------------------------------------------------------------------------------------------------------
 🚀 Funcionalidades Principais
