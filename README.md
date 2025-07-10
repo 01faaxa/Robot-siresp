@@ -49,3 +49,7 @@ Seleciona especialidade, profissional e data disponível.
 Se houver "Coleta" na observação, agenda exame laboratorial.
 
 Geração de relatórios (Excel + JSON com histórico).
+---------------------------------------------------------------------------------------------------------------------------------------
+
+📧 duetum@hotmail.com
+🔗 LinkedIn: https://www.linkedin.com/in/matheus-augusto-3a1152289/
