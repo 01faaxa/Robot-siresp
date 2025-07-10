@@ -38,7 +38,7 @@ CustomTkinter (Interface gráfica moderna)
 JSON (Armazenamento de histórico)
 -------------------------------------------------------------------------------------------------------------------------------------
 📊 Fluxo do Sistema
-Login no SI RESP (via automação Selenium).
+Login no SIRESP (via automação Selenium).
 
 Importação da planilha (seleção via interface gráfica).
 
