@@ -1,485 +1,803 @@
-from selenium import webdriver  # Para automatizar o navegador
-from selenium.webdriver.common.by import By  # Para localizar elementos na página
-from webdriver_manager.chrome import ChromeDriverManager  # Para gerenciar o driver do Chrome
-from selenium.webdriver.chrome.service import Service  # Para configurar o serviço do Chrome
-import time  # Para pausas no script
+from selenium import webdriver  
+from selenium.webdriver.common.by import By 
+from webdriver_manager.chrome import ChromeDriverManager  
+from selenium.webdriver.chrome.service import Service  
+import time  
 from selenium.webdriver.support.ui import Select
 import pandas as pd
-#from IPython.display import display
 from selenium.webdriver.common.by import By
-from selenium.webdriver.support import expected_conditions
 from customtkinter import *
 from tkinter import messagebox
 import customtkinter as ctk
 from CTkMessagebox import CTkMessagebox
+from selenium.webdriver.common.by import By
+from selenium.webdriver.support.ui import WebDriverWait
+from selenium.webdriver.support import expected_conditions as ec
+import numpy as nan
+from datetime import datetime
+from customtkinter import *
+import customtkinter as ctk
+import json
+from datetime import datetime
+
+
+def salvar_historico(relatorio):
+    try:
+        # Carrega o histórico existente (se houver)
+        with open('historico_agendamentos.json', 'r') as f:
+            historico = json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        historico = []
+    
+    # Adiciona os novos agendamentos ao histórico
+    historico.extend(relatorio)
+    
+    # Salva o histórico atualizado
+    with open('historico_agendamentos.json', 'w') as f:
+        json.dump(historico, f, indent=4, ensure_ascii=False)
+
+
+def carregar_historico():
+    try:
+        with open('historico_agendamentos.json', 'r') as f:
+            return json.load(f)
+    except (FileNotFoundError, json.JSONDecodeError):
+        return []
+carregar_historico
+
+relatorio = [] 
+def agendado_sucesso():
+    global agendamento_ok
+    agendamento_ok = {
+        'codigo' : indice['Código'],
+        'profissional' : indice['Profissional'],
+        'especialidade' : indice['Especialidade'], 
+        'observação' : indice["Observação"],
+        'status' : 'Agendado',
+        'data' : datetime.now().strftime('%Y-%m-%d %H:%M:%S'),  # Adiciona a data do agendamento
+    }
+    relatorio.append(agendamento_ok)
+    salvar_historico([agendamento_ok])  # Salva o agendamento no histórico
+agendado_sucesso
+
+def nao_agendado():
+    global nao_agendamento
+    nao_agendamento = {
+        'Código' : indice['Código'],
+        'profissional' : indice['Profissional'],
+        'especialidade' : indice['Especialidade'], 
+        'observação' : indice["Observação"],
+        'status' : 'Não agendado',
+    }
+    relatorio.append(nao_agendamento)
+    salvar_historico([agendamento_ok])
+nao_agendado    
+
+def gerar_relatorio_completo():
+    historico = carregar_historico()
+    if historico:
+        df = pd.DataFrame(historico)
+        nome_arquivo = f"Relatorio_Completo_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        df.to_excel(nome_arquivo, index=False)
+        CTkMessagebox(title="Sucesso!", message="Relatório completo gerado com sucesso!", icon="check", option_1="OK")
+    else:
+        CTkMessagebox(title="Aviso", message="Nenhum histórico encontrado!", icon="warning", option_1="OK")
+gerar_relatorio_completo
+
+def gerar_relatorio():
+    if relatorio:
+        df = pd.DataFrame(relatorio)
+        relatorios_excel = f"Relatorio_{datetime.now().strftime('%Y%m%d_%H%M')}.xlsx"
+        df.to_excel(relatorios_excel, index=False)
+        CTkMessagebox( title="Sucesso!", message="Relatorio Gerado com Sucesso!", icon="check", option_1="OK")
+gerar_relatorio
 
 def importar_planilha():
-    global caminho_pacientes
     global dicionario_pacientes
     caminho_pacientes = filedialog.askopenfilename(title="Selecione um arquivo Excel",filetypes=[("Excel", "*.xlsx")])  
     if caminho_pacientes:
         try:
-            ctk.set_appearance_mode("dark")
+            ctk.set_appearance_mode("blue")
             caminho_pacientes_leitura = pd.read_excel(caminho_pacientes)
             CTkMessagebox( title="Sucesso!", message="Operação concluída com sucesso!", icon="check", option_1="OK")
-            caminho_pacientes_formatacao = caminho_pacientes_leitura[['codigo', 'Especialidade', 'Profissional', 'Observação', 'Tipo Consulta']]
-            dicionario_pacientes = caminho_pacientes_formatacao.to_dict()
+            caminho_pacientes_formatacao = caminho_pacientes_leitura[['Código', 'Especialidade', 'Profissional', 'Observação', 'Tipo Consulta']]
+            dicionario_pacientes = caminho_pacientes_formatacao.to_dict('records')
+            
         except Exception as e:
             messagebox.showerror("Erro", f" Não foi possível ler o arquivo:\n{e}")
 importar_planilha
 
 def iniciar_siresp():
+    global drive_to_wait
+    drive_to_wait = 10
     global navegador
+    global iframe_site
+    global iframe_principal
+    global iframe_agenda_ce
+    global iframe_frm
     servico = Service(ChromeDriverManager().install()) # Instala automaticamente o ChromeDriver
     navegador = webdriver.Chrome(service=servico)
     navegador.get("https://www.siresp.saude.sp.gov.br")
-    navegador.find_element('xpath', '//*[@id="btn-4"]').click()
+    botao_ambulatorio = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//*[@id="btn-4"]')))
+    botao_ambulatorio.click()
+    #navegador.find_element('xpath', '//*[@id="btn-4"]').click()
     if navegador:
         CTkMessagebox( title="Sucesso!", message="Navegador aberto com sucesso!", icon="check", option_1="OK")
 iniciar_siresp
 
+def final_planilha():
+            verificacao = indice["codigo"]
+            if pd.isna(verificacao):
+                print('Não contém mais pacientes para ser agendados')
+                navegador.close()
+                CTkMessagebox(title="sucesso!",  message='Pacientes agendados com sucesso,\nAdicione uma nova planilha',icon="check", option_1="OK")
+            return True   
+final_planilha
+        
+def saindo_da_impress():
+    try:
+            alerta = WebDriverWait(navegador, drive_to_wait).until(ec.alert_is_present())
+            #alerta = navegador.switch_to.alert
+            alerta.dismiss()  # Clica em "Cancelar"
+            print("Alerta cancelado")
+            return True
+    except:
+        return False
+saindo_da_impress
 
-                    
 def Iniciar_robot(): 
+    historico_existente = carregar_historico()
+    print(f"Total de agendamentos no histórico: {len(historico_existente)}")
+    global indice
+    def retornando():
+        navegador.switch_to.parent_frame()
+        time.sleep(1)
+        navegador.switch_to.parent_frame()
+        caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO_CE"]')))
+        dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO_CE"]')))
+        navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+        select = Select(dropdown)
+        tipo_consulta_desejada = 'Consulta'
+        print('Tipo de consulta:', tipo_consulta_desejada)
+        select_texto = select.select_by_visible_text(tipo_consulta_desejada)
+        clickando = WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "FLT_F_COD_PACIENTE")]'))).click()
+        limpando = WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "FLT_F_COD_PACIENTE")]'))).clear()
+        #WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "Buscar")]'))).click()
+    retornando
     
     def aba_agendamento():
-        lista_menu = navegador.find_elements('class name', 'sf-with-ul')
+        iframe_site = WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'site')))
+        lista_menu = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.CLASS_NAME, 'sf-with-ul')))
+        #lista_menu = navegador.find_elements('class name', 'sf-with-ul')
         for botao in lista_menu:
             if 'Agendamento' in botao.text:
                 print("Agendamento Localizado")
                 botao.click()
-                
                 # Localizando submenu de Agenda
-                lista_agendamento = navegador.find_elements('xpath', '//a[contains(@href, "age_marcar.php?P=age_marcar")]')
+                lista_agendamento = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//a[contains(@href, "age_fila.php?P=age_fila")]')))
+                #lista_agendamento = navegador.find_elements('xpath', '//a[contains(@href, "age_marcar.php?P=age_marcar")]')
                 print("Agenda Localizada")
-                
                 for botao_agenda in lista_agendamento:
                     print(botao_agenda.text)
-                    if 'Agenda' in botao_agenda.text:
+                    if 'Cadastro Demanda por Recurso' in botao_agenda.text:
                         print("Elemento Localizado")
                         botao_agenda.click()
                     else:
                         print("Elemento não encontrado")
+    aba_agendamento   
     
+    aba_agendamento()
+    
+    def aba_listar():
+        time.sleep(1)
+        iframe_principal = WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'principal')))
+        WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//td[contains(@id, "c_listar")]'))).click()
+    aba_listar()
 
-      
-    for indice in range(len(dicionario_pacientes)):
-        time.sleep(3)  
-        # Passo 5: Navegando no menu de Agendamento
-        # Localizando todos os elementos do menu principal
-        def retornando_menu():
-            try:
-                navegador.refresh()
-                print('Atualizando a página')
-                return True
-            except:
-                print('Erro ao atualizar a página')
-                print('Passando para o próximo paciente')
-                time.sleep(5)
-                return False
-        if not retornando_menu():
-            print('Erro ao atualizar a página')
-            print('Atualizando Pagina')
-            print('Recomecando Busca')
-            navegador.refresh()
-            time.sleep(5) # Espera para carregamento
-            retornando_menu()
-        time.sleep(3)
+    for indice in dicionario_pacientes:
         
-        iframe = navegador.find_element('id', 'site')
-        navegador.switch_to.frame(iframe)
-        aba_agendamento()
-        time.sleep(5) # Espera para carregamento
-
-        def Buscar_Pac():
-            try:    
-                # Mudando para o iframe principal
-                iframe2 = navegador.find_element('id', 'principal')
-                navegador.switch_to.frame(iframe2)
-                print("Iframe Localizado")
-                codigo = int(dicionario_pacientes['codigo'][indice])
-                print(codigo)
-                # Inserindo código do paciente e buscando
-                colocando_cod = navegador.find_element('id', 'FLT_COD_PACIENTE').send_keys(f"{codigo}")
-                print('Código inserido')
-                buscando = navegador.find_element('name', 'btn_acao').click()
-                print('Botao selecionado')
-                return True
-            except:
-                print("Erro ao buscar paciente")
-                print("Passando para o próximo paciente")
-                return False
-        time.sleep(3)
-        if not Buscar_Pac():
-            print("Erro ao buscar paciente")
-            print("Recomeçando busca")
-            navegador.refresh()
-            time.sleep(4) # Espera para carregamento
-            retornando_menu()
-
-        # Função para selecionar a aba de especialidades
-        def aba_selecao():
-            try:
-                menu_selecao = navegador.find_element('id', 'c_filtro').click()
-                print("Menu Selecionado")
-                time.sleep(3)
-                return True
-            except:
-                print("Menu não encontrado, ou conexão lenta")
-                return False  
-        if not aba_selecao():
-            print("Erro ao selecionar menu")
-            navegador.refresh()
-            time.sleep(4)   
-            retornando_menu()
-        time.sleep(3)
-
-        # Função para selecionar a especialidade médica
-        """def sel_agenda():
-            tabelasColunas = navegador.find_element('id', 'layer_espec').find_elements('id', 'ID_ESPECIALIDADE_ARR')
-            divprinc = navegador.find_element(By.ID, 'layer_espec')
-            
-            for chk in tabelasColunas:
-                valor = chk.get_attribute("value")
-                try:
-                    camId = divprinc.find_element(By.ID, valor) 
-                    try:
-                        print('valor do id encontrado', valor)
-                        valor = camId.find_element(By.TAG_NAME, 'b')
-                        navegador.execute_script("arguments[0].scrollIntoView();", valor)
-                        print(valor.text)
-                        
-                        # Verificando se é a especialidade desejada
-                        if valor.text.strip() == "CARDIOLOGIA":
-                            print("Valor encontrado")
-                            print("Especialidade encontrada")
-                            chk.click()
-                            break
-                        else:
-                            print("Valor não encontrado")
-                    except:
-                        print(f"Elemento Tag Name:b, com o ID:{valor} não encontrado")
-                except:
-                    print('Elemento ID não existe nesse momento!')
-
-        sel_agenda()"""
-        time.sleep(5)
-
-        # Função para abrir a aba de seleção de médico
-        def aba_medico():
-            selecao = navegador.find_element(By.ID, 'c_profissional').click()
-        aba_medico()
-        time.sleep(6)
-
-        # Função para selecionar o médico
-        def sel_medico():
-            try:
-                tabelasColunas = navegador.find_element(By.ID, 'layer_prof').find_elements(By.ID, 'ID_PROFISSIONAL_ARR')
-                especialidade = str(dicionario_pacientes['Especialidade'][indice]).upper()
-                profissional = str(dicionario_pacientes['Profissional'][indice]).upper()
-                print(profissional, especialidade)
-                for chk in tabelasColunas:
-                    valor = chk.get_attribute("value")
-                    textovalor = f"{valor}"
-                    valorFiltrado = textovalor.replace("|", "")
-                    print(valorFiltrado)
-                    camId = navegador.find_element(By.ID, valorFiltrado)
-                    print('valor do id encontrado', valorFiltrado)
-                    valorid = camId.find_element(By.XPATH, f'//td[@id="{valorFiltrado}"]')
-                    navegador.execute_script("arguments[0].scrollIntoView();", valorid)
-                    
-                    # Limpando e formatando o texto
-                    texto_medico_especialidade = (f"{especialidade} {profissional}")
-                    textostringvalor = valorid.text
-                    texto_limpo = textostringvalor.strip().replace("&nbsp;", " ").replace("\n", " ").replace("\t", " ")
-                    print(texto_medico_especialidade)
-                    print(texto_limpo)
-                    # Verificando médico e especialidade
-                    if texto_medico_especialidade == texto_limpo: #and f"{profissional}" in texto_limpo:
-                        print("Valor encontrado")
-                        print("Medico encontrado")
-                        chk.click()
-                        return True
-                    else:
-                        print("Valor não encontrado")
-                print("Passando para o próximo paciente")
-                return False
-            except:
-                print('Especialidade não disponível')
-                print('Passando para o proximo paciente')
-                return False
-        time.sleep(2)
-        if not sel_medico():
-            print('Erro ao selecionar médico')
-            print('Passando para o próximo paciente')
-            continue
-        time.sleep(3)
-        # Função para selecionar agenda interna (comentada)
-        def aba_agInt():
-            try:
-                selecaoint = navegador.find_element('id', 'c_agenda_int').click()
-            except:
-                print("Erro ao selecionar agenda interna")
-                print("Passando para o próximo paciente")
-        time.sleep(3)
-        aba_agInt()
-        
+        def selecionar_especialidade():
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[contains(@name, "ID_ESP_EXA")]'))).click()
+            caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@name, "ID_ESP_EXA")]')))
+            dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@name, "ID_ESP_EXA")]')))
+            navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+            select = Select(dropdown)
+            especialidade_desejada = indice['Especialidade']
+            print(especialidade_desejada)
+            select_texto = select.select_by_visible_text(especialidade_desejada)
+            return
+        selecionar_especialidade()
+        time.sleep(1)
         def tipo_consulta():
-            try:    
-                iframedia = navegador.find_element(By.ID, 'agenda_ce')
-                navegador.switch_to.frame(iframedia)
-                time.sleep(4)
-                tip_consulta = str(dicionario_pacientes['Tipo Consulta'][indice]).upper()
-                print(tip_consulta)
-                #input('Pressione Enter para continuar...')
-                opcinter = 'INTERCONSULTA'
-                #opcretorno = 'Retorno'
-                # Selecionando o tipo de consulta
-                if tip_consulta == opcinter:
-                    time.sleep(4)
-                    navegador.find_element(By.NAME, 'FLT_INTERCONSULTA_CHK').click()
-                    print("Tipo de consulta selecionado : INTERCONSULTA")
-                    return
-                else:
-                    time.sleep(4)
-                    navegador.find_element(By.NAME, 'FLT_RETORNO_CHK').click()
-                    print("Tipo de consulta selecionado : RETORNO")
-                    return
-                #input("Pressione Enter para continuar...") #esperando o usuario preencher a captcha
-            except:
-                print("Não Ha mais cotas para esta especialidade")
-                print('passando para o proximo paciente')
-        time.sleep(5)
+            time.sleep(1)
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[@name="TIPO"]'))).click()
+            caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO"]')))
+            dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO"]')))
+            navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+            select = Select(dropdown)
+            tipo_consulta_desejada = indice['Tipo Consulta']
+            print('Tipo de consulta:', tipo_consulta_desejada)
+            select_texto = select.select_by_visible_text(tipo_consulta_desejada)
         tipo_consulta()
         
-        # Seção final comentada para seleção de dia na agenda
+        def colocar_cod():
+            time.sleep(1)
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "FLT_F_COD_PACIENTE")]'))).send_keys(indice['Código'])
+        colocar_cod()
+
+        def buscar():
+            time.sleep(1)
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "Buscar")]'))).click()
+        buscar()
+        time.sleep(0.5)
+        def selecionar_profissional():
+            time.sleep(1)
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[contains(@name, "ID_PROFISSIONAL")]'))).click()
+            caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@name, "ID_PROFISSIONAL")]')))
+            dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@name, "ID_PROFISSIONAL")]')))
+            navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+            select = Select(dropdown)
+            profissional_desejado = indice['Profissional']
+            print(profissional_desejado)
+            select_texto = select.select_by_visible_text(profissional_desejado)
+            return
+        selecionar_profissional()
+        time.sleep(0.5)
+        buscar()
+        time.sleep(0.5)
+        def selecionar_paciente():
+           try:
+                time.sleep(1)
+                print("Formulário localizado")
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@type="radio" and @name="V_ID_FILA_SELECIONA"]'))).click()
+                return True
+           except:
+               time.sleep(1)
+               return False
+        if not selecionar_paciente():
+            retornando()
+            CTkMessagebox(title="Erro!", message="PACIENTE JA POSSUI AGENDAMENTO NESTA ESPECIALIDADE!", icon="cancel", option_1="OK")
+            agendado_sucesso()
+            continue
+    
         def sel_diaAg():
-            print("Selecionando dia")
-            #iframedia = navegador.find_element(By.ID, 'agenda_ce')
-            #navegador.switch_to.frame(iframedia)
-            print("Iframe Agenda Localizado")
-            #selecionando Tipo de Consulta
-            #selConsulta = navegador.find_element(By.XPATH, '//tr[@class="dados"]//td')
-            #divprinc = navegador.find_element(By.CLASS_NAME, 'div') 
-            div_mes0 = navegador.find_elements(By.XPATH, '//div[@id="div_mes0"]//td')
-            div_mes1 = navegador.find_elements(By.XPATH, '//div[@id="div_mes1"]//td')
-            div_mes2 = navegador.find_elements(By.XPATH, '//div[@id="div_mes2"]//td')
-            div_mes3 = navegador.find_elements(By.XPATH, '//div[@id="div_mes3"]//td')
-            div_mes4 = navegador.find_elements(By.XPATH, '//div[@id="div_mes4"]//td')
-            
             try:
+                global data_formatada
+                global data_formatada_consulta
+                iframe_agenda_ce = WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'agenda_ce')))
+                time.sleep(2)
+                print("Selecionando dia")
+                div_mes0 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes0")]//td')))
+                print("DIV 0 ENCONTRADA")
+                div_mes1 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes1")]//td')))
+                div_mes2 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes2")]//td')))
+                div_mes3 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes3")]//td')))
+                div_mes4 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes4")]//td')))
                 try:
-                    for percorre in div_mes0:
-                        #time.sleep(0.5)
-                        mes = navegador.find_element(By.ID, 'mes0')
-                        print(f"Percorrendo agenda de {mes.text}")
-                        verificando = percorre.get_attribute("class")
-                        print(verificando)
-                        # Verifica se o texto contém a data desejada
-                        condicao = "dia dados p" == verificando
-                        condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
-                        if condicao or condicao2 == verificando:
-                            print("Dia encontrado")
-                            # Clica no dia desejado
-                            clicou = percorre.click()
-                            return True
-                        else :
-                            print("procurando próximo dia disponivel")
-                    navegador.find_element(By.ID, 'mes1').click()   
+                    try:
+                        for percorre in div_mes0:
+                            mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes0')))
+                            #mes = navegador.find_element(By.ID, 'mes0')
+                            print(f"Percorrendo agenda de {mes.text}")
+                            verificando = percorre.get_attribute("class")
+                            data = percorre.get_attribute('id')
+                            try:
+                                data_formatada = (f"{data}").upper().split("|")[2]
+                                print(data_formatada_consulta)
+                                data_formatada_consulta = datetime.strptime(data_formatada,  "%Y-%m-%d").date()
+                                print(data_formatada_consulta)
+                            except: 
+                                ...
+                            print(verificando)
+                            # Verifica se o texto contém a data desejada
+                            condicao = "dia dados p" == verificando
+                            condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
+                            if condicao or condicao2:
+                                print(data)
+                                print("Dia encontrado")
+                                # Clica no dia desejado
+                                percorre.click()
+                                return True
+                            else :
+                                print("procurando próximo dia disponivel")
+                        
+                        WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes1'))).click()
+                        #navegador.find_element(By.ID, 'mes1').click()   
+                    except:
+                        print('passando para o proximo paciente') 
+                        return False
+                    
+                    # Percorrendo os dias do mês 1
+                    try:
+                        for percorre in div_mes1:
+                            #time.sleep(0.5)
+                            mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes1')))
+                            #mes = navegador.find_element(By.ID, 'mes1')
+                            print(f"Percorrendo agenda de {mes.text}")
+                            verificando = percorre.get_attribute("class")
+                            data = percorre.get_attribute('id')
+                            print(data)
+                            try:
+                                data_formatada = (f"{data}").upper().split("|")[2]
+                                print(data_formatada)
+                                data_formatada_consulta = datetime.strptime(data_formatada,  "%Y-%m-%d").date()
+                                print(data_formatada_consulta)
+                            except: 
+                                ...
+                            print(verificando)
+                            condicao = "dia dados p" == verificando
+                            condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
+                            # Verifica se o texto contém a data desejada
+                            if condicao or condicao2:
+                                print(data_formatada_consulta)
+                                print("Dia encontrado")
+                                # Clica no dia desejado
+                                percorre.click()
+                                return True
+                            else :
+                                print("Dia não encontrado, procurando próximo dia")
+                        
+                        WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes2'))).click()       
+                        #navegador.find_element(By.ID, 'mes2').click()
+                        
+                    except:
+                        print('passando para o proximo paciente')
+                        return False 
+                    try:
+                        for percorre in div_mes2:
+                            mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes2')))
+                            #mes = navegador.find_element(By.ID, 'mes2')
+                            print(f"Percorrendo agenda de {mes.text}")
+                            verificando = percorre.get_attribute("class")
+                            data = percorre.get_attribute('id')
+                            print(data)
+                            try:
+                                    data_formatada = (f"{data}").upper().split("|")[2]
+                                    print(data_formatada)
+                                    data_formatada_consulta = datetime.strptime(data_formatada,  "%Y-%m-%d").date()
+                                    print(data_formatada_consulta)
+                            except: 
+                                 ...
+                            print(verificando)
+                            condicao = "dia dados p" == verificando
+                            condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
+                            # Verifica se o texto contém a data desejada
+                            if condicao or condicao2:
+                                print(data)
+                                print("Dia encontrado")
+                                # Clica no dia desejado
+                                percorre.click()
+                                return True
+                            else :
+                                print("Dia não encontrado, procurando próximo")
+                        WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes3'))).click()       
+                    except:
+                        print('passando para o proximo paciente')
+                        return False   
+                    
+                    try:            
+                        for percorre in div_mes3:
+                            mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes3')))
+                            #mes = navegador.find_element(By.ID, 'mes3')
+                            print(f"Percorrendo agenda de {mes.text}")
+                            verificando = percorre.get_attribute("class")
+                            data = percorre.get_attribute('id')
+                            print(data)
+                            try:
+                                data_formatada = (f"{data}").upper().split("|")[2]
+                                print(data_formatada)
+                                data_formatada_consulta = datetime.strptime(data_formatada,  "%Y-%m-%d").date()
+                                print(data_formatada_consulta)
+                            except: 
+                                ...
+                            print(verificando)
+                            condicao = "dia dados p" == verificando
+                            condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
+                            # Verifica se o texto contém a data desejada
+                            if condicao or condicao2:
+                                print(data)
+                                print("Dia encontrado")
+                                # Clica no dia desejado
+                                percorre.click()
+                                return True
+                                break
+                            else :
+                                print("Dia não encontrado, procurando próximo")
+                        WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes4'))).click()    
+                        #navegador.find_element(By.ID, 'mes4').click()
+                    except:
+                        print('passando para o proximo paciente') 
+                        return False
+                    try:       
+                        for percorre in div_mes4:
+                            mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes4')))
+                            #mes = navegador.find_element(By.ID, 'mes4')
+                            print(f"Percorrendo agenda de {mes.text}")
+                            verificando = percorre.get_attribute("class")
+                            data = percorre.get_attribute('id')
+                            try:
+                                data_formatada = (f"{data}").upper().split("|")[2]
+                                print(data_formatada)
+                                data_formatada_consulta = datetime.strptime(data_formatada,  "%Y-%m-%d").date()
+                                print(data_formatada_consulta)
+                            except: 
+                                ...
+                            print(verificando)
+                            condicao = "dia dados p" == verificando
+                            condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
+                            # Verifica se o texto contém a data desejada
+                            if condicao or condicao2:
+                                print(data)
+                                print("Dia encontrado")
+                                # Clica no dia desejado
+                                percorre.click()
+                                return True
+                                break
+                            else :
+                                print("Dia não encontrado, procurando próximo")
+                        
+                        print(f"Agendamento no mes: {mes.text} não disponível")
+                    except:
+                        print('passando para o proximo paciente')
+                        return False                
                 except:
-                    print('passando para o proximo paciente') 
+                    print("Agendamento Não Disponivel para esta especialidade")  
+                    print("Passando para o proximo paciente")
                     return False
-                
-                # Percorrendo os dias do mês 1
-                try:
-                    for percorre in div_mes1:
-                        #time.sleep(0.5)
-                        mes = navegador.find_element(By.ID, 'mes1')
-                        print(f"Percorrendo agenda de {mes.text}")
-                        verificando = percorre.get_attribute("class")
-                        print(verificando)
-                        condicao = "dia dados p" == verificando
-                        condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
-                        # Verifica se o texto contém a data desejada
-                        if condicao or condicao2:
-                            print("Dia encontrado")
-                            # Clica no dia desejado
-                            percorre.click()
-                            return True
-                        else :
-                            print("Dia não encontrado, procurando próximo dia")
-                            
-                    navegador.find_element(By.ID, 'mes2').click()
-                    
-                except:
-                    print('passando para o proximo paciente')
-                    return False 
-                try:
-                    for percorre in div_mes2:
-                    # time.sleep(0.5)
-                        mes = navegador.find_element(By.ID, 'mes2')
-                        print(f"Percorrendo agenda de {mes.text}")
-                        verificando = percorre.get_attribute("class")
-                        print(verificando)
-                        condicao = "dia dados p" == verificando
-                        condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
-                        # Verifica se o texto contém a data desejada
-                        if condicao or condicao2:
-                            print("Dia encontrado")
-                            # Clica no dia desejado
-                            percorre.click()
-                            return True
-                        else :
-                            print("Dia não encontrado, procurando próximo")
-                    
-                    navegador.find_element(By.ID, 'mes3').click()
-                except:
-                    print('passando para o proximo paciente')
-                    return False   
-                
-                try:            
-                    for percorre in div_mes3:
-                        mes = navegador.find_element(By.ID, 'mes3')
-                        print(f"Percorrendo agenda de {mes.text}")
-                        verificando = percorre.get_attribute("class")
-                        print(verificando)
-                        condicao = "dia dados p" == verificando
-                        condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
-                        # Verifica se o texto contém a data desejada
-                        if condicao or condicao2:
-                            print("Dia encontrado")
-                            # Clica no dia desejado
-                            percorre.click()
-                            return True
-                            break
-                            
-                        else :
-                            print("Dia não encontrado, procurando próximo")
-                    
-                    navegador.find_element(By.ID, 'mes4').click()
-                except:
-                    print('passando para o proximo paciente') 
-                    return False
-        
-                
-                try:       
-                    for percorre in div_mes4:
-                        mes = navegador.find_element(By.ID, 'mes4')
-                        print(f"Percorrendo agenda de {mes.text}")
-                        verificando = percorre.get_attribute("class")
-                        print(verificando)
-                        condicao = "dia dados p" == verificando
-                        condicao2 = "dia dados p azul_escuro p tp_interno" == verificando
-                        # Verifica se o texto contém a data desejada
-                        if condicao or condicao2:
-                            print("Dia encontrado")
-                            # Clica no dia desejado
-                            percorre.click()
-                            return True
-                            break
-                        else :
-                            print("Dia não encontrado, procurando próximo")
-                    
-                    print(f"Agendamento no mes: {mes.text} não disponível")
-                except:
-                    print('passando para o proximo paciente')
-                    return False        
-                            
-            except:
-                print("Agendamento Não Disponivel para esta especialidade")  
-                print("Passando para o proximo paciente")
+                return False
+            except: 
                 return False
         if not sel_diaAg():
-            print("Agendamento não disponível")
-            print("Passando para o proximo paciente")
-            continue
-        time.sleep(3)     
-                
-                
+            CTkMessagebox( title="Vagas", message="NÃO HÁ MAIS COTAS PARA ESTÁ ESPECIALIDADE!\nINSIRA UMA NOVA LISTA DE PACIENTES, DE UMA ESPECIALIDADE DIFERENTE", icon="check", option_1="OK")
+            navegador.close()
+            
+        def cid():
+            try:
+                iframe_frm = WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'frm')))
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[contains(@class, "text")]'))).click()
+                caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@class, "text")]')))
+                dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[contains(@class, "text")]')))
+                navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+                select = Select(dropdown)
+                listaopc = select.options[0:]
+                primopc = listaopc[1]
+                if primopc:
+                    primopc.click()
+                    print(primopc.text)
+                    return True
+                else:
+                    return
+            except:
+                print("Não precisa de CID!")
+        cid()
         def selecionar_horario():
-            time.sleep(5)
-            print("Procurando Horario disponível")
-            #clicar para abrir a caixa de opçoes
-            horario_frame = navegador.find_element(By.ID, 'horario_frame')
-            navegador.switch_to.frame(horario_frame)
-            navegador.find_element(By.XPATH, "//select[contains(@name, 'CB_CONSULTA')]").click()
-            caminho = navegador.find_element(By.XPATH, "//select[contains(@name, 'CB_CONSULTA')]")
-            time.sleep(2)
-
-            #drop.find_element(By.NAME,'CB_CONSULTA').click()
-            #divsec = divprin.find_elements(By.TAG_NAME, 'td')
-            #(By.XPATH, f'//td[@id="{valorFiltrado}"]')
-            #clicando = navegador.find_element(By.NAME, 'CB_CONSULTA').click()
-
-            dropdown = caminho.find_element(By.XPATH, "//select[contains(@name, 'CB_CONSULTA')]")
-            roll = Select(dropdown)
-            listaopc = roll.options[0:] # Pega todas as opções
-            primopc= listaopc[1]
-            #navegador.execute_script("arguments[0].click();", primopc)
-            #dropdown.select_by_index(1)
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[@name="CB_CONSULTA"]'))).click()
+            caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CB_CONSULTA"]')))
+            dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CB_CONSULTA"]')))
+            navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+            select = Select(dropdown)
+            listaopc = select.options[0:]
+            primopc = listaopc[1]
             if primopc:
-                print("Espere 1 segundo, selecionando horario disponivel")
-                time.sleep(1)
                 primopc.click()
                 print(primopc.text)
+                return True
             else:
-                print("Não ha horarios Disponiveis") 
+                return
         selecionar_horario()
-        time.sleep(2)
-
-        def comentando():
-            try:    
-                observacao = dicionario_pacientes['Observação'][indice]
-                procurando_obs = navegador.find_element(By.NAME, 'AGE_OBSERVACAO')
-                time.sleep(1)
-                navegador.execute_script("arguments[0].scrollIntoView();", procurando_obs)
-                procurando_obs.click()
-                procurando_obs.send_keys(f"{observacao}//ROBOT")
-            except:
-                print("Não é possivel comentar")
-                return
-        comentando()
-        #input("Pressione Enter para continuar...") #esperando o usuario preencher a captcha
-        time.sleep(2)
-
-        def botao_agendar_paciente():
-            try:
-                procurando_botao = navegador.find_element(By.NAME, 'marcar_c')
-                procurando_botao.click()
-            except:
-                print("Erro ao Agendar o Paciente")
-                print("Passando para o próximo paciente")
-                saindo_da_impress()   
-        botao_agendar_paciente()
-        time.sleep(1)
-        def alert_a():
-            try:
-                print("Procurando Alerta")   
-                time.sleep(2)
-                print("Clicando no alerta")
-                div_widget = navegador.find_element(By.XPATH, 'u/html/body/div')
-                print('Div Widget encontrado')
-                time.sleep(2)
-                div_protocolo = div_widget.find_element(By.XPATH, '//*[@id="divMostraProtocolo"]')
-                print('Div Protocolo encontrado')
-                time.sleep(2)
-                div_protocolo.find_element(By.XPATH, '//*[@id="btn_incluir"]').click()
-                print("Alerta encontrado")
-            except:
-                return
-        alert_a()
+        time.sleep(0.5)
+        def observacao():
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@name="AGE_OBSERVACAO"]'))).click()
+            comentario = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//input[@name="AGE_OBSERVACAO"]')))
+            comentario.send_keys(f"{indice['Observação']}------ROBOT")
+        observacao()
+        time.sleep(0.5)
+        def botao_marcar():
+            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@name="marcar_c"]'))).click()
+        botao_marcar()
         
-        time.sleep(3)
         def saindo_da_impress():
-            try:
-                alerta = navegador.switch_to.alert
-                alerta.dismiss()  # Clica em "Cancelar"
-                print("Alerta cancelado")
-                print("Retornando ao agendamento")
-            except:
-                return
+            alert = WebDriverWait(navegador, drive_to_wait).until(ec.alert_is_present())
+            print(alert.text)
+            alert.dismiss()
         saindo_da_impress()
-        time.sleep(2)
-input()
+        
+        def alerta_fila():
+            try:
+                time.sleep(1)
+                timeout = 3
+                WebDriverWait(navegador, timeout).until(ec.element_to_be_clickable((By.XPATH, '//input[@name="btn_fechar"]'))).click()
+                return True
+            except:
+                print("Alerta não encontrado, ou conexão lenta")
+                return False
+        alerta_fila()
+        
+        # Volta para o contexto principal do navegador
+        agendado_sucesso()
+        time.sleep(1)
+        retornando()
+        time.sleep(1)
 
+        # Passo 6: Verificando se o paciente foi agendado com sucesso
+        COLETAR = 'COLETAR'
+        COLETA = 'COLETA'
+        observacao_FORMATADO = (f"{indice['Observação']}").upper()
+        print(observacao_FORMATADO)
+        if 'COLETA' in observacao_FORMATADO or'COLETAR' in observacao_FORMATADO:
+            def sel_exames():
+                time.sleep(1)
+                print("SELECIONANDO EXAMES")
+                caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO_CE"]')))
+                dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="TIPO_CE"]')))
+                navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+                select = Select(dropdown)
+                tipo_consulta_desejada = 'Exame'
+                print('Tipo de consulta:', tipo_consulta_desejada)
+                select_texto = select.select_by_visible_text(tipo_consulta_desejada)
+            sel_exames()
+            
+            time.sleep(1)
+            
+            def colocar_cod_exame():
+                time.sleep(1)
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "FLT_F_COD_PACIENTE")]'))).send_keys(indice['Código'])
+            colocar_cod_exame()
+            
+            time.sleep(1)
+            
+            def buscar_paciente_exames():
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "Buscar")]'))).click()
+            buscar_paciente_exames()
+            
+            def selecionar_coleta():
+                caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CBO_ID_GRUPO_COTA"]')))
+                dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CBO_ID_GRUPO_COTA"]')))
+                navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+                select = Select(dropdown)
+                cota_desejada = 'LABORATÓRIO - INTERNO'
+                print('Tipo de consulta:', cota_desejada)
+                select_texto = select.select_by_visible_text(cota_desejada)
+                time.sleep(1)
+                #--------------------------------------------------------------
+                caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="ID_ESP_EXA"]')))
+                dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="ID_ESP_EXA"]')))
+                navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+                select = Select(dropdown)
+                exame_desejado = 'COLETA DE MATERIAL P/ EXAME LABORATORIAL'
+                print('Tipo de consulta:', exame_desejado)
+                select_texto = select.select_by_visible_text(exame_desejado)
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[contains(@name, "Buscar")]'))).click()
+            selecionar_coleta()
+            
+            time.sleep(1.5)
+            observacao_medica = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//td[@colspan ="20"]')))
+            print(observacao_medica.text)
+            obs_upper = observacao_medica.text.upper()
+            obs_final = (f"{obs_upper}")
+            profissional=(f"{indice["Profissional"]}").upper().split()
+            print(obs_upper)
+            time.sleep(2)
+            for parte in profissional:
+                if parte in obs_upper:
+                    WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@type="radio" and @name="V_ID_FILA_SELECIONA"]'))).click()
+                    
+            def sel_dia_exa():
+                try:
+                    iframe_agenda_ce = WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'agenda_ce')))
+                    time.sleep(2)
+                    print("Selecionando dia")
+                    div_mes0 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes0")]//td')))
+                    print("DIV 0 ENCONTRADA")
+                    div_mes1 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes1")]//td')))
+                    div_mes2 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes2")]//td')))
+                    div_mes3 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes3")]//td')))
+                    div_mes4 = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_all_elements_located((By.XPATH, '//div[contains(@id, "div_mes4")]//td')))
+                    try:
+                        try:
+                            for percorre in div_mes0:
+                                mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes0')))
+                                #mes = navegador.find_element(By.ID, 'mes0')
+                                print(f"Percorrendo agenda de {mes.text}")
+                                verificando = percorre.get_attribute("class")
+                                data_exame = percorre.get_attribute('id')
+                                try:
+                                    data_formatada_exame = (f"{data_exame}").upper().split("|")[2]
+                                    data_comparativa_exame = datetime.strptime(data_formatada_exame,  "%Y-%m-%d").date()
+                                    print (data_comparativa_exame)
+                                except: 
+                                    ...
+                                print(verificando)
+                                # Verifica se o texto contém a data desejada
+                                condicao = "dia dados p" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                condicao2 = "dia dados p azul_escuro p tp_interno" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                if condicao or condicao2:
+                                    print(data_exame)
+                                    print("Dia encontrado")
+                                    # Clica no dia desejado
+                                    percorre.click()
+                                    return True
+                                else :
+                                    print("procurando próximo dia disponivel")
+                            
+                            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes1'))).click()
+                            #navegador.find_element(By.ID, 'mes1').click()   
+                        except:
+                            print('passando para o proximo paciente') 
+                            return False
+                        
+                        # Percorrendo os dias do mês 1
+                        try:
+                            for percorre in div_mes1:
+                                #time.sleep(0.5)
+                                mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes1')))
+                                #mes = navegador.find_element(By.ID, 'mes1')
+                                print(f"Percorrendo agenda de {mes.text}")
+                                verificando = percorre.get_attribute("class")
+                                data_exame = percorre.get_attribute('id')
+                                try:
+                                    data_formatada_exame = (f"{data_exame}").upper().split("|")[2]
+                                    data_comparativa_exame = datetime.strptime(data_formatada_exame,  "%Y-%m-%d").date()
+                                    print (data_comparativa_exame)
+                                except: 
+                                    ...
+                                print(verificando)
+                                condicao = "dia dados p" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                condicao2 = "dia dados p azul_escuro p tp_interno" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                # Verifica se o texto contém a data desejada
+                                if condicao or condicao2:
+                                    print(data_exame)
+                                    print("Dia encontrado")
+                                    # Clica no dia desejado
+                                    percorre.click()
+                                    return True
+                                else :
+                                    print("Dia não encontrado, procurando próximo dia")
+                            
+                            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes2'))).click()       
+                            #navegador.find_element(By.ID, 'mes2').click()
+                            
+                        except:
+                            print('passando para o proximo paciente')
+                            return False 
+                        try:
+                            for percorre in div_mes2:
+                                mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes2')))
+                                #mes = navegador.find_element(By.ID, 'mes2')
+                                print(f"Percorrendo agenda de {mes.text}")
+                                verificando = percorre.get_attribute("class")
+                                data_exame= percorre.get_attribute('id')
+                                try:
+                                    data_formatada_exame = (f"{data_exame}").upper().split("|")[2]
+                                    data_comparativa_exame = datetime.strptime(data_formatada_exame,  "%Y-%m-%d").date()
+                                    print (data_comparativa_exame)
+                                except: 
+                                    ...
+                                print(verificando)
+                                condicao = "dia dados p" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                condicao2 = "dia dados p azul_escuro p tp_interno" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                # Verifica se o texto contém a data desejada
+                                if condicao or condicao2:
+                                    print(data_exame)
+                                    print("Dia encontrado")
+                                    # Clica no dia desejado
+                                    percorre.click()
+                                    return True
+                                else :
+                                    print("Dia não encontrado, procurando próximo")
+                            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes3'))).click()       
+                        except:
+                            print('passando para o proximo paciente')
+                            return False   
+                        
+                        try:            
+                            for percorre in div_mes3:
+                                mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes3')))
+                                #mes = navegador.find_element(By.ID, 'mes3')
+                                print(f"Percorrendo agenda de {mes.text}")
+                                verificando = percorre.get_attribute("class")
+                                data_exame = percorre.get_attribute('id')
+                                try:
+                                    data_formatada_exame = (f"{data_exame}").upper().split("|")[2]
+                                    data_comparativa_exame = datetime.strptime(data_formatada_exame,  "%Y-%m-%d").date()
+                                    print (data_comparativa_exame)
+                                except: 
+                                    ...
+                                print(verificando)
+                                condicao = "dia dados p" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                condicao2 = "dia dados p azul_escuro p tp_interno" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                # Verifica se o texto contém a data desejada
+                                if condicao or condicao2:
+                                    print(data_exame)
+                                    print("Dia encontrado")
+                                    # Clica no dia desejado
+                                    percorre.click()
+                                    return True
+                                    break
+                                else :
+                                    print("Dia não encontrado, procurando próximo")
+                            WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.ID, 'mes4'))).click()    
+                            #navegador.find_element(By.ID, 'mes4').click()
+                        except:
+                            print('passando para o proximo paciente') 
+                            return False
+                        try:       
+                            for percorre in div_mes4:
+                                mes = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.ID, 'mes4')))
+                                #mes = navegador.find_element(By.ID, 'mes4')
+                                print(f"Percorrendo agenda de {mes.text}")
+                                verificando = percorre.get_attribute("class")
+                                data_exame = percorre.get_attribute('id')
+                                try:
+                                    data_formatada_exame = (f"{data_exame}").upper().split("|")[2]
+                                    data_comparativa_exame = datetime.strptime(data_formatada_exame,  "%Y-%m-%d").date()
+                                    diferenca = abs((data_formatada_consulta - data_comparativa_exame).days)
+                                    print (data_comparativa_exame)
+                                except: 
+                                    ...
+                                    
+                                print(verificando)
+                                condicao = "dia dados p" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                condicao2 = "dia dados p azul_escuro p tp_interno" == verificando and 15 <= abs((data_formatada_consulta - data_comparativa_exame).days) <= 20
+                                # Verifica se o texto contém a data desejada
+                                if condicao or condicao2:
+                                    print(data_exame)
+                                    print("Dia encontrado")
+                                    # Clica no dia desejado
+                                    percorre.click()
+                                    return True
+                                    break
+                                else :
+                                    print("Dia não encontrado, procurando próximo")
+                            
+                            print(f"Agendamento no mes: {mes.text} não disponível")
+                        except:
+                            print('passando para o proximo paciente')
+                            return False                
+                    except:
+                        print("Agendamento Não Disponivel para esta especialidade")  
+                        print("Passando para o proximo paciente")
+                        return False
+                    return False
+                except: 
+                    return False
+            if not sel_dia_exa():
+                CTkMessagebox( title="Vagas", message="NÃO HÁ MAIS COTAS PARA ESTÁ ESPECIALIDADE!\nINSIRA UMA NOVA LISTA DE PACIENTES, DE UMA ESPECIALIDADE DIFERENTE", icon="check", option_1="OK")
+                navegador.close()
+                
+            def selecionar_horario_exame():
+                WebDriverWait(navegador, drive_to_wait).until(ec.frame_to_be_available_and_switch_to_it((By.ID, 'frm')))
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//select[@name="CB_EXAME"]'))).click()
+                caminho = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CB_EXAME"]')))
+                dropdown = WebDriverWait(caminho, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//select[@name="CB_EXAME"]')))
+                navegador.execute_script("arguments[0].scrollIntoView(true);", dropdown)
+                select = Select(dropdown)
+                listaopc = select.options[0:]
+                primopc = listaopc[1]
+                if primopc:
+                    primopc.click()
+                    print(primopc.text)
+                    return True
+                else:
+                    return
+            selecionar_horario_exame()
+        
+            def observacao_exame():
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@name="AGE_OBSERVACAO"]'))).click()
+                comentario = WebDriverWait(navegador, drive_to_wait).until(ec.presence_of_element_located((By.XPATH, '//input[@name="AGE_OBSERVACAO"]')))
+                comentario.send_keys(f"A PDD DO DR/DRA {indice['Profissional']}------ROBOT")
+            observacao_exame()
+            
+            time.sleep(0.5)
+            
+            def marcar_exame():
+                WebDriverWait(navegador, drive_to_wait).until(ec.element_to_be_clickable((By.XPATH, '//input[@name="marcar_e"]'))).click()
+            marcar_exame()
+            
+            saindo_da_impress()
+            alerta_fila()
+            retornando()
+    navegador.close()
+    CTkMessagebox( title="Agendado!", message="AGENDADO COM SUCESSO!", icon="check", option_1="OK")
 
+Iniciar_robot
